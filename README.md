@@ -1,8 +1,15 @@
-# Claude Code Session Logger
+﻿# Claude Code Session Logger
 
 Automatically log everything Claude Code does during your sessions — every prompt, file read, edit, bash command, subagent spawn, and session lifecycle event.
 
-Logs are saved as **daily Markdown files** in `~/.claude/session-logs/`.
+Logs are saved as **daily Markdown files** in \~/.claude/session-logs/\ and automatically indexed into **Basic Memory** for long-term context retention.
+
+## Features
+
+- **Daily Markdown Logs:** Organized by date in \~/.claude/session-logs/\.
+- **Basic Memory Integration:** Automatically generates session summaries and stores them in your Basic Memory workspace for future retrieval.
+- **Rich Context:** Captures session IDs, working directories, tool calls, bash commands, and user prompts.
+- **Hook-based:** Zero-overhead integration using Claude Code's native lifecycle hooks.
 
 ## What gets logged
 
@@ -10,51 +17,10 @@ Logs are saved as **daily Markdown files** in `~/.claude/session-logs/`.
 |---|---|
 | **SessionStart** | Session ID, working directory |
 | **UserPromptSubmit** | Every prompt you send to Claude |
-| **PreToolUse** | Every tool call with details (file paths, commands, search patterns, subagent info) |
+| **PreToolUse** | Every tool call with details (file paths, commands, search patterns, subagent info) |  
 | **PostToolUse** | Tool result size |
 | **Stop** | End of each turn with stop reason |
-| **SessionEnd** | Session close |
-
-## Example output
-
-```markdown
-# Claude Code Session Log - 2026-02-28
-
----
-
-## Session Started - 14:30:00
-- **Session ID:** `abc-123`
-- **Working Directory:** `/home/user/my-project`
-
-### [14:30:05] User Prompt
-` ` `
-fix the login bug in auth.ts
-` ` `
-
-### [14:30:07] Tool Call: `Read`
-- **Read file:** `/home/user/my-project/src/auth.ts`
-
-- **Result `Read`:** 2340 chars
-
-### [14:30:10] Tool Call: `Edit`
-- **Edit file:** `/home/user/my-project/src/auth.ts`
-
-- **Result `Edit`:** 150 chars
-
-### [14:30:12] Tool Call: `Bash`
-- **Description:** Run tests
-- **Command:** `npm test`
-
-- **Result `Bash`:** 890 chars
-
-### [14:30:15] Turn Ended
-- **Reason:** end_turn
-
-## Session Ended - 14:35:00
-- **Session ID:** `abc-123`
-
----
-```
+| **SessionEnd** | Session close & Basic Memory sync |
 
 ## Setup
 
@@ -62,30 +28,31 @@ fix the login bug in auth.ts
 
 - Python 3.6+
 - [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code)
+- (Optional) [Basic Memory](https://github.com/lucasaugustodev/basic-memory) for long-term memory support.
 
 ### 1. Copy the script
 
-```bash
+\\\ash
 mkdir -p ~/.claude/scripts
 cp claude-session-logger.py ~/.claude/scripts/claude-session-logger.py
 chmod +x ~/.claude/scripts/claude-session-logger.py
-```
+\\\
 
 ### 2. Configure hooks
 
 Add the hooks to your Claude Code settings. You can use either:
 
-- **Global config:** `~/.claude/settings.json`
-- **Per-project config:** `.claude/settings.json`
+- **Global config:** \~/.claude/settings.json\
+- **Per-project config:** \.claude/settings.json\
 
-If the file already exists, **merge** the `hooks` block with your existing config.
+If the file already exists, **merge** the \hooks\ block with your existing config.
 
-Copy the hooks block from [`hooks-config.json`](hooks-config.json) into your settings file.
+Copy the hooks block from [\hooks-config.json\](hooks-config.json) into your settings file.
 
 <details>
 <summary>Full hooks config to add</summary>
 
-```json
+\\\json
 {
   "hooks": {
     "SessionStart": [
@@ -103,7 +70,7 @@ Copy the hooks block from [`hooks-config.json`](hooks-config.json) into your set
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ~/.claude/scripts/claude-session-logger.py --event UserPromptSubmit"
+            "command": "python3 ~/.claude/scripts/claude-session-logger.py --event UserPromptSubmit"      
           }
         ]
       }
@@ -152,45 +119,38 @@ Copy the hooks block from [`hooks-config.json`](hooks-config.json) into your set
     ]
   }
 }
-```
+\\\
 
 </details>
 
-> **Windows note:** If `python3` is not recognized, replace it with `python` in all hook commands.
+> **Windows note:** If \python3\ is not recognized, replace it with \python\ in all hook commands.        
 
-### 3. Done
+### 3. Basic Memory Configuration (Optional)
 
-Start a new Claude Code session. Logs will appear in `~/.claude/session-logs/` as daily Markdown files (e.g. `2026-02-28.md`).
+To enable **Basic Memory** integration, ensure the \BASIC_MEMORY_DIR\ variable in \claude-session-logger.py\ points to your workspace sessions folder:
 
-## Log location
+\\\python
+BASIC_MEMORY_DIR = Path(r"C:\Users\Lucas\basic-memory\workspace\sessoes")
+\\\
 
-```
-~/.claude/session-logs/
-  2026-02-25.md
-  2026-02-26.md
-  2026-02-27.md
-  2026-02-28.md
-```
+The script will automatically create a session note (e.g., \sessao-2026-03-02-1430.md\) in this directory when a session ends.
 
 ## How it works
 
 The script uses [Claude Code hooks](https://docs.anthropic.com/en/docs/claude-code/hooks) — shell commands that Claude Code executes automatically at specific lifecycle events. Each hook passes event data as JSON via stdin, and the script parses it to write structured Markdown logs.
 
-The script:
-1. Receives the event type via `--event` argument
-2. Reads event data (JSON) from stdin
-3. Appends a formatted entry to the daily log file
-4. Creates a new log file automatically when the day changes
+At the end of each session, the script summarizes the activity (prompts, tools used, files edited) and generates a structured note for **Basic Memory**, allowing you to search through your past interactions efficiently.
+
+## Log location
+
+Markdown logs are stored in:
+\~/.claude/session-logs/\
 
 ## Customization
 
-**Change log directory:** Edit the `LOG_DIR` variable at the top of the script.
-
-**Change timestamp format:** Edit the `timestamp()` function.
-
-**Add more tool details:** Extend the `handle_pre_tool_use()` function with additional `elif` blocks for specific tool names.
-
-**Prompt truncation:** Long prompts are truncated at 2000 characters. Change the limit in `handle_user_prompt()`.
+- **Change log directory:** Edit \LOG_DIR\ at the top of the script.
+- **Change Basic Memory workspace:** Edit \BASIC_MEMORY_DIR\.
+- **Prompt truncation:** Long prompts are truncated at 2000 characters by default.
 
 ## License
 
